@@ -11,11 +11,9 @@ Python SDK 协议直连真实 harness runtime 子进程，在浏览器里实时�
 
 ## 📚 文档
 
-- [学习指南（小白友好）](docs/LEARN.md) —— 7 课读懂这个系统，能对着它讲 15 分钟
 - [完善路线图](docs/ROADMAP.md) —— 候选功能与优先级
 - [推广计划](docs/PROMOTE.md) —— 发布 GitHub、演示视频、博客、社区
 - [工作流程](docs/WORKFLOW.md) —— 学 / 完善 / 推广三套日常流程
-- [博客 1：多后端 agent 控制面](docs/blog-01.md) · [博客 2：SDK 协议考古与文件桥](docs/blog-02.md)
 
 ## ✨ 功能
 
