@@ -1,4 +1,0 @@
-# dsh-secret-guard bundle patch：向宿主组合插入敏感信息防护插件。
-- insert:
-    - id: dsh-secret-guard
-      name: dsh-secret-guard
