@@ -1,0 +1,1815 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Desktop Workbench</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #11151d; --panel2: #161b26; --border: #1e2530;
+    --text: #d7dee8; --muted: #7d8798; --accent: #22d3ee; --accent-dim: #155e75;
+    --ok: #34d399; --warn: #fbbf24; --err: #f87171; --chip: #20293a;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font: 13.5px/1.55 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #232b3a; border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2f3a4e; }
+
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+    border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto;
+  }
+  header .logo {
+    width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #0e7490, #155e75); color: #cffafe; font-weight: 800; font-size: 14px;
+  }
+  header h1 { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 11.5px; }
+  .runtime-pill {
+    margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 11.5px;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; background: var(--panel2);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.err { background: var(--err); }
+  .btn {
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+    padding: 5px 12px; border-radius: 7px; cursor: pointer; font-size: 12px;
+  }
+  .btn:hover { border-color: #33405a; background: #1b2230; }
+  .btn.primary { background: var(--accent-dim); border-color: #0e7490; color: #cffafe; }
+  .btn.primary:hover { background: #0e7490; }
+  .btn.small { padding: 3px 9px; font-size: 11px; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 238px; flex: 0 0 238px; background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  aside.right { border-right: none; border-left: 1px solid var(--border); width: 300px; flex: 0 0 300px; }
+  .pane-title {
+    padding: 10px 14px 6px; font-size: 10.5px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.2px; display: flex; align-items: center; gap: 8px;
+  }
+  .pane-title .spacer { flex: 1; }
+  .scroll { overflow-y: auto; flex: 1; min-height: 0; padding: 4px 10px 12px; }
+
+  .session-item {
+    padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 3px;
+    border: 1px solid transparent; display: flex; flex-direction: column; gap: 3px;
+  }
+  .session-item:hover { background: var(--panel2); }
+  .session-item.active { background: var(--panel2); border-color: var(--accent-dim); }
+  .session-item .row { display: flex; align-items: center; gap: 7px; }
+  .session-item .sid { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .session-item .title { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+  .session-item .meta { font-size: 10.5px; color: var(--muted); }
+  .badge { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .badge.running { background: #0e2a33; color: var(--accent); }
+  .badge.idle { background: #0d2b20; color: var(--ok); }
+  .badge.error { background: #33151a; color: var(--err); }
+  .badge.cancelled { background: #33291a; color: var(--warn); }
+
+  section.center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #transcript { flex: 1; overflow-y: auto; padding: 18px 26px 8px; }
+  #empty { height: 100%; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 0 40px; font-size: 12.5px; line-height: 2; }
+  #empty b { color: var(--accent); font-weight: 600; }
+
+  .msg { margin-bottom: 14px; max-width: 84%; }
+  .msg.user { margin-left: auto; }
+  .msg .bubble { padding: 9px 13px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+  .msg.user .bubble { background: #123a46; border: 1px solid #155e75; border-top-right-radius: 3px; }
+  .msg.assistant .bubble { background: var(--panel2); border: 1px solid var(--border); border-top-left-radius: 3px; }
+  .msg .who { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .msg .who .t { font-family: var(--mono); font-size: 10px; }
+  .msg .foot { font-size: 10px; color: var(--muted); margin-top: 5px; font-family: var(--mono); }
+
+  .reasoning {
+    border: 1px dashed #2b3a52; border-radius: 8px; margin-top: 7px; font-size: 11.5px; overflow: hidden;
+  }
+  .reasoning summary { cursor: pointer; padding: 5px 10px; color: var(--muted); font-size: 10.5px; user-select: none; }
+  .reasoning .body { border-top: 1px dashed #2b3a52; padding: 7px 10px; color: #93a5bd; white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+
+  .turn-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 16px; color: var(--muted); font-size: 11px; }
+  .turn-divider::before, .turn-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .turn-divider .reason {
+    font-family: var(--mono); font-size: 10px; color: var(--accent); background: var(--chip);
+    padding: 1px 8px; border-radius: 999px;
+  }
+
+  .tool-card {
+    border: 1px solid var(--border); border-radius: 10px; background: var(--panel);
+    margin: 8px 0; overflow: hidden; font-size: 12px;
+  }
+  .tool-card .head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; user-select: none; }
+  .tool-card .head:hover { background: var(--panel2); }
+  .tool-card .tw { width: 7px; height: 7px; border-radius: 2px; background: var(--accent); flex: 0 0 auto; }
+  .tool-card .tw.err { background: var(--err); }
+  .tool-card .tw.pending { background: var(--warn); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .tool-card .name { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+  .tool-card .status { margin-left: auto; color: var(--muted); font-size: 10.5px; font-family: var(--mono); }
+  .tool-card .body { display: none; border-top: 1px solid var(--border); padding: 8px 12px 10px; }
+  .tool-card.open .body { display: block; }
+  .tool-card pre {
+    background: #0a0d13; border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; margin-top: 5px;
+    overflow-x: auto; font-family: var(--mono); font-size: 11px; color: #9fb0c6; white-space: pre-wrap; word-break: break-word;
+  }
+  .tool-card .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; margin-top: 7px; }
+
+  /* ---------- diff 高亮（参考 Cline / Roo Code） ---------- */
+  .diff-view {
+    font-family: var(--mono); font-size: 11px; line-height: 1.5;
+    background: #0a0d13; border: 1px solid var(--border); border-radius: 6px;
+    margin-top: 5px; overflow-x: auto; max-height: 320px; overflow-y: auto;
+  }
+  .diff-view div { padding: 0 8px; white-space: pre; }
+  .diff-add { background: rgba(52, 211, 153, .12); color: #86efac; }
+  .diff-del { background: rgba(248, 113, 113, .12); color: #fca5a5; }
+  .diff-hunk { background: rgba(34, 211, 238, .10); color: #67e8f9; }
+  .diff-hdr { color: var(--muted); }
+
+  .status-line { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11.5px; margin: 10px 0 14px; }
+  .status-line .spinner {
+    width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--chip);
+    border-top-color: var(--accent); animation: spin 0.8s linear infinite; flex: 0 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .live-thinking {
+    border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 8px 12px;
+    margin: 8px 0; font-size: 11.5px; color: #93a5bd; font-family: var(--mono); white-space: pre-wrap;
+    max-height: 150px; overflow-y: auto;
+  }
+
+  .composer { flex: 0 0 auto; padding: 12px 26px 16px; border-top: 1px solid var(--border); }
+  .composer .box { display: flex; gap: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; align-items: flex-end; }
+  .composer .box:focus-within { border-color: var(--accent-dim); }
+  #input {
+    flex: 1; background: transparent; border: none; outline: none; resize: none;
+    color: var(--text); font: 13px/1.5 system-ui, sans-serif; max-height: 180px; min-height: 22px;
+  }
+  .composer .hint { color: var(--muted); font-size: 10.5px; margin-top: 6px; padding-left: 4px; }
+
+  .tabs { display: flex; gap: 4px; padding: 8px 12px 0; }
+  .tab {
+    flex: 1; text-align: center; padding: 6px 4px; font-size: 11px; color: var(--muted);
+    border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer;
+  }
+  .tab.active { background: var(--panel2); color: var(--text); border-color: var(--border); font-weight: 600; }
+
+  .log-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; overflow: hidden; background: var(--panel2); }
+  .log-item .head { display: flex; align-items: center; gap: 7px; padding: 6px 9px; cursor: pointer; }
+  .log-item .method { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .log-item .time { font-size: 10px; color: var(--muted); margin-left: auto; font-family: var(--mono); }
+  .log-item pre { display: none; border-top: 1px solid var(--border); padding: 7px 9px; font-size: 10.5px; overflow-x: auto; max-height: 320px; overflow-y: auto; }
+  .log-item.open pre { display: block; }
+
+  .tree-node { font-size: 12px; padding: 4px 0 4px 14px; border-left: 1px solid var(--border); margin-left: 8px; }
+  .tree-node .sid { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .tree-node.done .sid { color: var(--ok); text-decoration: line-through; text-decoration-color: #2a5c4a; }
+  .tree-node .rel { color: var(--muted); font-size: 10.5px; margin-left: 6px; }
+
+  .request-card { border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); padding: 10px; margin-bottom: 8px; }
+  .request-card .method { font-family: var(--mono); color: var(--warn); font-size: 11.5px; }
+  .request-card .actions { display: flex; gap: 7px; margin-top: 9px; }
+  .request-card pre { background: #0a0d13; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-top: 7px; font-size: 10.5px; overflow-x: auto; }
+
+  .empty-note { color: var(--muted); font-size: 11.5px; padding: 14px 6px; text-align: center; }
+  code { background: #0a0d13; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: .92em; color: #9fd8e6; }
+  pre.code { background: #0a0d13; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-top: 6px; overflow-x: auto; font-family: var(--mono); font-size: 11px; }
+
+  /* ---------- event log filter ---------- */
+  .tabpane { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .ev-filter { padding: 8px 10px 7px; border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+  .ev-filter input[type="text"] {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 5px 9px; font-size: 11.5px; outline: none;
+  }
+  .ev-filter input[type="text"]:focus { border-color: var(--accent-dim); }
+  .ev-chips { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+  .chip {
+    font-size: 10.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border);
+    cursor: pointer; color: var(--muted); user-select: none;
+  }
+  .chip:hover { border-color: #33405a; color: var(--text); }
+  .chip.active { background: var(--accent-dim); border-color: #0e7490; color: #cffafe; }
+  .ev-toggle {
+    display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 10.5px;
+    color: var(--muted); cursor: pointer; user-select: none;
+  }
+  .ev-list { flex: 1; }
+  .ev-count { font-size: 10px; color: var(--muted); padding: 5px 10px 3px; font-family: var(--mono); }
+  #toLatest {
+    position: absolute; right: 12px; bottom: 12px; z-index: 5;
+    box-shadow: 0 2px 10px rgba(0,0,0,.5); background: var(--accent-dim); border-color: #0e7490; color: #cffafe;
+  }
+  #toLatest:hover { background: #0e7490; }
+  .dot-cat { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .cat-tool { background: var(--accent); }
+  .cat-msg { background: var(--ok); }
+  .cat-turn { background: #a78bfa; }
+  .cat-sub { background: var(--warn); }
+  .cat-other { background: #64748b; }
+  .log-item.grouped .head { background: rgba(34, 211, 238, .06); }
+  .log-item .count-badge {
+    font-size: 10px; font-family: var(--mono); background: var(--chip); color: var(--accent);
+    padding: 1px 7px; border-radius: 999px;
+  }
+
+  /* ---------- approval modal ---------- */
+  .tab-badge {
+    display: inline-block; min-width: 15px; padding: 0 4px; margin-left: 4px; border-radius: 999px;
+    background: var(--err); color: #fff; font-size: 9.5px; text-align: center; line-height: 14px;
+  }
+  .modal {
+    position: fixed; inset: 0; z-index: 100; background: rgba(4, 6, 10, .66);
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal.open { display: flex; }
+  .modal-card {
+    width: 420px; max-width: 92vw; background: var(--panel); border: 1px solid var(--warn);
+    border-radius: 14px; padding: 18px 20px; box-shadow: 0 18px 60px rgba(0,0,0,.6);
+  }
+  .modal-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .modal-tool {
+    margin-top: 12px; font-family: var(--mono); font-size: 12.5px; color: var(--accent);
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  }
+  .modal-reason { margin-top: 9px; font-size: 12px; color: var(--muted); word-break: break-word; max-height: 120px; overflow-y: auto; }
+  .modal-meta { margin-top: 8px; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions .btn { flex: 1; padding: 8px 0; font-size: 12.5px; }
+  .modal-actions .btn.trust { border-color: var(--ok); color: var(--ok); background: #0d2b20; }
+  .modal-actions .btn.trust:hover { background: #123b2c; }
+  .modal-note { margin-top: 10px; font-size: 10.5px; color: var(--muted); text-align: center; }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 200;
+    background: var(--panel2); border: 1px solid var(--accent-dim); color: var(--text);
+    border-radius: 999px; padding: 8px 18px; font-size: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+    opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+  .badge.trusted { background: #0d2b20; color: var(--ok); }
+
+  /* ---------- 大肥鱼桌宠 ---------- */
+  #pet { position: fixed; right: 30px; bottom: 20px; z-index: 90; cursor: grab; user-select: none; }
+  #pet.dragover #petImg { filter: drop-shadow(0 0 16px var(--accent)); }
+  #petSpriteWrap { position: relative; }
+  #petImg { width: 118px; height: auto; pointer-events: none; }
+  .pet-l2d { width: 150px; height: 190px; pointer-events: none; }
+  .pet-l2d canvas { display: block; }
+  .pet-mode {
+    position: absolute; bottom: calc(100% - 8px); right: -6px; z-index: 5;
+    width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel2); font-size: 12px; cursor: pointer; line-height: 1;
+    opacity: .55;
+  }
+  .pet-mode:hover { opacity: 1; border-color: var(--accent-dim); }
+  .pet-mode.on { opacity: 1; border-color: var(--accent); }
+  .pet-mode.pet-feed { right: 22px; }
+  .pet-sleep { position: absolute; top: -4px; right: 2px; font-size: 22px; animation: sleepFloat 2.6s ease-in-out infinite; }
+  @keyframes sleepFloat { 50% { transform: translateY(-5px); } }
+  .pet-bubble {
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: var(--panel2); border: 1px solid var(--accent-dim); color: var(--text);
+    padding: 5px 12px; border-radius: 10px; font-size: 11.5px; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.45); display: none; max-width: 240px; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pet-bubble.show { display: block; animation: bubblePop .18s ease-out; }
+  @keyframes bubblePop { from { transform: translateX(-50%) scale(.8); opacity: 0; } }
+  #pet.idle #petImg { animation: petBob 2.8s ease-in-out infinite; }
+  #pet.thinking #petImg { animation: petThink 1.1s ease-in-out infinite; transform-origin: bottom center; }
+  #pet.tool #petImg { animation: petWiggle .5s ease-in-out infinite; transform-origin: bottom center; }
+  #pet.approval #petImg { animation: petPulse 1s ease-in-out infinite; }
+  #pet.done #petImg { animation: petJump .7s ease-out; }
+  #pet.error #petImg { animation: petWiggle .4s ease-in-out 2; transform-origin: bottom center; }
+  #pet.sleep #petImg { animation: petSleepBob 3.6s ease-in-out infinite; filter: brightness(.72) saturate(.65); }
+  @keyframes petBob { 50% { transform: translateY(-7px); } }
+  @keyframes petThink { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+  @keyframes petWiggle { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+  @keyframes petPulse { 50% { transform: scale(1.07); } }
+  @keyframes petJump {
+    0% { transform: translateY(0); } 35% { transform: translateY(-28px); }
+    65% { transform: translateY(3px); } 100% { transform: translateY(0); }
+  }
+  @keyframes petSleepBob { 50% { transform: translateY(-2px); } }
+
+  /* ---------- 布局改善（参考 VSCode / OpenHands / Cline） ---------- */
+  .icon-btn { width: 30px; padding: 5px 0; text-align: center; font-size: 13px; flex: 0 0 auto; }
+  body.collapse-left aside.left { display: none; }
+  body.collapse-right aside.right { display: none; }
+  .session-search { padding: 2px 10px 7px; flex: 0 0 auto; }
+  .session-search input {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 5px 9px; font-size: 11.5px; outline: none;
+  }
+  .session-search input:focus { border-color: var(--accent-dim); }
+  .session-bar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+    padding: 7px 26px; border-bottom: 1px solid var(--border); background: var(--panel);
+    min-height: 40px;
+  }
+  .session-bar .sb-left { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; }
+  .session-bar .sb-title {
+    font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42%;
+  }
+  .session-bar .sb-meta { color: var(--muted); font-size: 11px; font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .composer .ctx-line {
+    color: var(--muted); font-size: 10.5px; margin-bottom: 5px; padding-left: 4px;
+    display: flex; align-items: center; gap: 6px; font-family: var(--mono);
+  }
+  .composer .ctx-line .ctx-runtime { color: var(--accent); }
+  #replayBar {
+    display: none; align-items: center; gap: 10px; padding: 6px 26px;
+    border-bottom: 1px solid var(--border); background: rgba(34, 211, 238, .05); font-size: 11px;
+  }
+  #replayBar input[type="range"] { flex: 1; accent-color: var(--accent); height: 4px; }
+  .rb-label { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+  .replay-banner {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 6px 12px;
+    border: 1px solid var(--accent-dim); border-radius: 8px; background: rgba(34, 211, 238, .08);
+    color: var(--accent); font-size: 11.5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="btn icon-btn" id="toggleLeft" title="折叠 / 展开会话栏">☰</button>
+  <div class="logo">AW</div>
+  <div>
+    <h1>Agent Desktop Workbench</h1>
+    <div class="sub">DeepSeek Harness · 多后端控制面 · 桌宠</div>
+  </div>
+  <select id="runtimeSelect" class="btn" style="max-width:230px"></select>
+  <button class="btn" id="newRuntime">+ 运行时</button>
+  <button class="btn" id="newSession">+ 新会话</button>
+  <button class="btn" id="exportSession">导出</button>
+  <div class="runtime-pill"><span class="dot" id="rtDot"></span><span id="rtText">runtime 未启动</span></div>
+  <button class="btn icon-btn" id="toggleRight" title="折叠 / 展开事件栏">»</button>
+</header>
+
+<main>
+  <aside class="left">
+    <div class="pane-title">会话 <span class="spacer"></span></div>
+    <div class="session-search"><input type="text" id="sessionSearch" placeholder="🔍 搜索会话…"></div>
+    <div class="scroll" id="sessionList"></div>
+  </aside>
+
+  <section class="center">
+    <div class="session-bar">
+      <div class="sb-left">
+        <span class="sb-title" id="sbTitle">—</span>
+        <span id="sbBadge"></span>
+        <span class="sb-meta" id="sbMeta"></span>
+      </div>
+      <button class="btn small" id="stop" style="display:none">⏹ 停止</button>
+      <button class="btn small" id="replayBtn" title="回放该会话的事件流（拖动滑块回看任意一步）">⏪ 回放</button>
+    </div>
+    <div id="replayBar">
+      <span class="rb-label" id="rbLabel">⏪ 回放</span>
+      <input type="range" id="rbSlider" min="0" max="0" value="0">
+      <button class="btn small" id="rbExit">退出回放</button>
+    </div>
+    <div id="transcript">
+      <div id="empty">
+        <div>
+          <b>Agent Desktop Workbench</b><br>
+          选择一个会话，在下方输入任务让 agent 执行。<br>
+          左侧是会话列表，右侧是实时事件流 / 子代理 / 请求 / 统计。
+        </div>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="ctx-line" id="ctxLine">选择或新建一个会话…</div>
+      <div class="box">
+        <textarea id="input" rows="1" placeholder="给 agent 下达任务…（Enter 发送，Shift+Enter 换行）"></textarea>
+        <button class="btn primary" id="send">发送</button>
+      </div>
+      <div class="hint">Agent 运行在本地 harness runtime 子进程中 · 事件通过 SSE 实时推送 · bash 调用需审批，可"允许本会话全部"</div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="tabs">
+      <div class="tab active" data-tab="events">事件流</div>
+      <div class="tab" data-tab="subagents">子代理</div>
+      <div class="tab" data-tab="requests">请求<span class="tab-badge" id="reqBadge" style="display:none"></span></div>
+      <div class="tab" data-tab="skills">技能</div>
+      <div class="tab" data-tab="schedules">定时</div>
+      <div class="tab" data-tab="stats">统计</div>
+    </div>
+    <div class="tabpane" id="tabEvents">
+      <div class="ev-filter">
+        <input type="text" id="evSearch" placeholder="🔍 搜索事件（方法/类型/内容）…">
+        <div class="ev-chips">
+          <span class="chip active" data-cat="all">全部</span>
+          <span class="chip" data-cat="important">重要</span>
+          <span class="chip" data-cat="tools">工具</span>
+          <span class="chip" data-cat="messages">消息</span>
+          <span class="chip" data-cat="subagents">子代理</span>
+        </div>
+        <label class="ev-toggle"><input type="checkbox" id="collapseChunks" checked> 折叠流式 chunk（assistant/chunk ×N）</label>
+      </div>
+      <div class="scroll ev-list" id="evList"></div>
+      <button class="btn small" id="toLatest" style="display:none">↓ 最新</button>
+    </div>
+    <div class="scroll" id="tabSubagents" style="display:none"></div>
+    <div class="scroll" id="tabRequests" style="display:none"></div>
+    <div class="scroll" id="tabSkills" style="display:none"></div>
+    <div class="scroll" id="tabSchedules" style="display:none"></div>
+    <div class="scroll" id="tabStats" style="display:none"></div>
+  </aside>
+</main>
+
+<div class="modal" id="approvalModal">
+  <div class="modal-card">
+    <div class="modal-title">🔐 Agent 请求执行工具</div>
+    <div class="modal-tool" id="amTool"></div>
+    <div class="modal-reason" id="amReason"></div>
+    <div class="modal-meta" id="amMeta"></div>
+    <div class="modal-actions">
+      <button class="btn primary" id="amAllow">允许本次</button>
+      <button class="btn trust" id="amTrust">允许本会话全部</button>
+      <button class="btn" id="amDeny">拒绝</button>
+    </div>
+    <div class="modal-note">超时 120s 未处理将自动拒绝（fail-closed）</div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- 大肥鱼桌宠：拖文件给我处理；状态随 agent 运行变化 -->
+<div id="pet" title="大肥鱼 · 拖文件给我处理">
+  <button id="petMode" class="pet-mode" title="切换桌宠形态（大肥鱼精灵 / Live2D）">🎀</button>
+  <button id="petFeed" class="pet-mode pet-feed" title="喂食">🍥</button>
+  <div id="petBubble" class="pet-bubble"></div>
+  <div id="petSpriteWrap">
+    <img id="petImg" src="/static/pet/front.png" alt="大肥鱼桌宠">
+    <div id="petL2D" class="pet-l2d" style="display:none"></div>
+    <div id="petSleep" class="pet-sleep" style="display:none">💤</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================ state ============================ */
+const S = {
+  runtimes: new Map(),       // id -> {id, name, model, status, pid, started}
+  activeRuntime: null,
+  activeId: null,
+  sessions: new Map(),      // id -> {id, runtimeId, created, title, prompts}
+  notifs: new Map(),        // id -> [{method, payload, runId, ts}]
+  runs: new Map(),          // id -> {run_id, status, started, text, error}
+  subagents: new Map(),     // childId -> {parentId, status, ts}
+  requests: new Map(),      // id -> {id, method, payload}
+  approvals: new Map(),     // id -> {id, toolName, reason, agentSession, ts}
+  trusted: new Set(),       // sessionIds auto-allowed for the rest of their run
+  modalCurrent: null,       // approval id currently shown in the modal
+  modalQueue: [],           // approval ids waiting behind the modal
+  sessionFilter: "",        // left-panel session search
+  schedules: new Map(),     // id -> {id, runtime_id, session_id, text, interval_minutes, daily, enabled, last_run}
+  replay: null,             // {pos, total} 事件流回放位置；null = 实时模式
+  costAlert: {threshold: parseFloat(localStorage.getItem("wb.costThreshold")) || 5, lastBelow: true},
+  evFilter: {search: "", cat: "all", collapseChunks: true},
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const time = () => new Date().toLocaleTimeString("zh-CN", {hour12:false});
+const shortId = (id) => (id || "").slice(-8);
+const pretty = (v) => { try { return JSON.stringify(v, null, 2); } catch (_) { return String(v); } };
+
+/* ============================ markdown-lite ============================ */
+function md(text) {
+  const lines = String(text ?? "").split("\n");
+  let out = [], inCode = false, codeBuf = [];
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      if (inCode) { out.push('<pre class="code">' + esc(codeBuf.join("\n")) + "</pre>"); codeBuf = []; }
+      inCode = !inCode; continue;
+    }
+    if (inCode) { codeBuf.push(line); continue; }
+    let t = esc(line);
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    if (/^#{1,4}\s/.test(t)) t = '<b class="mdh">' + t.replace(/^#+\s/, "") + "</b>";
+    else if (/^[-*]\s/.test(t)) t = "• " + t.replace(/^[-*]\s/, "");
+    out.push(t);
+  }
+  if (inCode) out.push('<pre class="code">' + esc(codeBuf.join("\n")) + "</pre>");
+  return out.join("\n");
+}
+
+/* ============================ SSE ============================ */
+function connect() {
+  const es = new EventSource("/api/events");
+  es.onmessage = (e) => { try { handle(JSON.parse(e.data)); } catch (_) {} };
+  es.onerror = () => { setRt({status:"closed"}); };
+}
+
+function handle(msg) {
+  switch (msg.kind) {
+    case "hello": if (msg.state) bootstrap(msg.state); break;
+    case "runtime": upsertRuntime(msg); break;
+    case "session-recovered":
+      if (!S.sessions.has(String(msg.session.id))) {
+        S.sessions.set(String(msg.session.id), {...msg.session, runtimeId: msg.runtime_id});
+        renderSessions();
+        if (!S.activeId) { S.activeId = String(msg.session.id); renderTranscript(); }
+      }
+      break;
+    case "run": onRun(msg); break;
+    case "notification": onNotification(msg); break;
+    case "request":
+      S.requests.set(String(msg.id), {id: msg.id, method: msg.method, payload: msg.payload});
+      renderRequests(); break;
+    case "request-resolved":
+      S.requests.delete(String(msg.id)); renderRequests(); break;
+    case "approval":
+      S.approvals.set(String(msg.id), {id: msg.id, toolName: msg.toolName, reason: msg.reason,
+        agentSession: msg.agentSession, ts: msg.ts});
+      renderRequests();
+      showApprovalModal(String(msg.id));
+      break;
+    case "approval-resolved":
+      S.approvals.delete(String(msg.id));
+      renderRequests();
+      if (S.modalCurrent === String(msg.id)) closeApprovalModal();
+      if (msg.decision === "unavailable") toast("⚠ 审批超时未处理，已自动拒绝");
+      else if (msg.auto) toast("✓ 已自动允许（本会话已信任）");
+      else if (msg.trusted) toast("✓ 已允许，本会话后续工具调用自动放行");
+      break;
+    case "trust":
+      if (msg.trusted) S.trusted.add(String(msg.session_id));
+      else S.trusted.delete(String(msg.session_id));
+      renderSessions(); renderRequests();
+      break;
+    case "schedules":
+      S.schedules.clear();
+      for (const t of msg.schedules || []) S.schedules.set(String(t.id), t);
+      renderSchedules();
+      break;
+    case "schedule-fired":
+      toast("⏰ 定时任务触发：" + String(msg.text || "").slice(0, 40));
+      break;
+  }
+}
+
+function bootstrap(state) {
+  for (const [rid, rs] of Object.entries(state.runtimes || {})) {
+    S.runtimes.set(rid, {id: rid, ...(rs.info || {})});
+    for (const s of rs.sessions || []) S.sessions.set(s.id, {...s, runtimeId: rid});
+    for (const [sid, run] of Object.entries(rs.runs || {})) S.runs.set(sid, run);
+    for (const [sid, arr] of Object.entries(rs.notifications || {})) {
+      for (const n of arr) pushNotif(sid, n);
+    }
+    for (const a of rs.pendingApprovals || []) {
+      S.approvals.set(String(a.id), {id: a.id, toolName: a.toolName, reason: a.reason,
+        agentSession: a.agentSession, ts: a.ts});
+    }
+    for (const sid of rs.trustedSessions || []) S.trusted.add(String(sid));
+  }
+  if (!S.activeRuntime && S.runtimes.size) S.activeRuntime = [...S.runtimes.keys()][0];
+  if (!S.activeId) {
+    for (const sid of S.sessions.keys()) { S.activeId = sid; break; }
+  }
+  renderRuntimes();
+  renderSessions();
+  renderRequests();
+  if (S.activeId) { renderTranscript(); renderEvents(); }
+}
+
+function upsertRuntime(rt) {
+  S.runtimes.set(rt.runtime_id, {id: rt.runtime_id, name: rt.name, model: rt.model,
+    status: rt.status, pid: rt.pid, started: rt.started, backend: rt.backend || "harness"});
+  if (!S.activeRuntime) S.activeRuntime = rt.runtime_id;
+  renderRuntimes();
+  renderHeaderStatus();
+}
+
+function renderRuntimes() {
+  const sel = $("runtimeSelect");
+  if (!S.runtimes.size) { sel.innerHTML = '<option>（无运行时）</option>'; return; }
+  sel.innerHTML = [...S.runtimes.values()].map(r => {
+    const be = r.backend === "codex" ? "🐍 codex" : "🐋 harness";
+    const label = `${r.name} · ${be} · ${r.model || "?"} · ${r.status === "running" ? "●" : "○"}`;
+    return `<option value="${r.id}" ${r.id === S.activeRuntime ? "selected" : ""}>${esc(label)}</option>`;
+  }).join("");
+}
+
+function renderHeaderStatus() {
+  const rt = S.runtimes.get(S.activeRuntime);
+  const dot = $("rtDot"), txt = $("rtText");
+  if (!rt) { dot.className = "dot err"; txt.textContent = "无运行时"; return; }
+  dot.className = "dot" + (rt.status === "running" ? " on" : " err");
+  txt.textContent = rt.status === "running"
+    ? `${rt.name} · ${rt.model || ""} · pid ${rt.pid || "?"}`
+    : `${rt.name} · 未运行`;
+}
+
+function setRt(rt) { upsertRuntime(rt); }  // legacy alias
+
+/* ============================ runs / notifications ============================ */
+function onRun(msg) {
+  if (!S.sessions.has(msg.session_id)) {
+    S.sessions.set(msg.session_id, {id: msg.session_id, runtimeId: msg.runtime_id, created: Date.now()});
+  } else {
+    const s = S.sessions.get(msg.session_id);
+    if (!s.runtimeId && msg.runtime_id) s.runtimeId = msg.runtime_id;
+  }
+  S.runs.set(msg.session_id, {run_id: msg.run_id, status: msg.status, started: msg.started, text: msg.text, error: msg.error});
+  if (msg.status === "started" && msg.text) {
+    pushNotif(msg.session_id, {method: "session.event", payload: {event: {type: "user/message", data: {content: [{type: "text", text: msg.text}]}}, source: "synthetic"}, runId: msg.run_id, ts: time()});
+  }
+  renderSessions();
+  petOnRun(msg);
+  if (S.activeId === msg.session_id) renderTranscript();
+}
+
+function onNotification(msg) {
+  pushNotif(msg.session_id, {...msg.notification, runId: msg.run_id, ts: time()});
+  if (msg.notification.method === "subagent.started") {
+    const p = msg.notification.payload || {};
+    S.subagents.set(String(p.childSessionId), {parentId: String(p.parentSessionId), status: "running", ts: time()});
+    renderSubagents();
+  }
+  if (msg.notification.method === "subagent.finished") {
+    const p = msg.notification.payload || {};
+    if (S.subagents.has(String(p.childSessionId))) S.subagents.get(String(p.childSessionId)).status = "done";
+    renderSubagents();
+  }
+  if (S.activeId === msg.session_id) {
+    const ev = msg.notification.payload && typeof msg.notification.payload.event === "object"
+      ? msg.notification.payload.event : null;
+    if (ev && ev.type === "assistant/chunk") updateLiveChunk(msg.notification);
+    else scheduleRender();
+  }
+  petOnNotification(msg);
+}
+
+function pushNotif(sessionId, n) {
+  if (!S.notifs.has(sessionId)) S.notifs.set(sessionId, []);
+  const arr = S.notifs.get(sessionId);
+  arr.push(n);
+  if (arr.length > 1200) arr.splice(0, arr.length - 1200);
+}
+
+/* ============================ session switching ============================ */
+function selectSession(id) {
+  S.activeId = id;
+  if (S.replay) exitReplay();
+  renderSessions(); renderTranscript(); renderEvents();
+}
+
+/* ============================ render: sessions ============================ */
+function renderSessions() {
+  const box = $("sessionList");
+  let ids = [...S.sessions.keys()];
+  if (S.sessionFilter) {
+    const q = S.sessionFilter.toLowerCase();
+    ids = ids.filter(id => {
+      const s = S.sessions.get(id);
+      const rt = s.runtimeId ? S.runtimes.get(s.runtimeId) : null;
+      const hay = ((s && s.title) || "") + " " + id + " " + (rt ? rt.name : "");
+      return hay.toLowerCase().includes(q);
+    });
+  }
+  if (!ids.length) { box.innerHTML = '<div class="empty-note">' + (S.sessionFilter ? "没有匹配的会话。" : "还没有会话。新建一个开始。") + '</div>'; return; }
+  box.innerHTML = ids.map(id => {
+    const s = S.sessions.get(id);
+    const run = S.runs.get(id);
+    const rt = s.runtimeId ? S.runtimes.get(s.runtimeId) : null;
+    const st = run ? run.status : "idle";
+    const badge = `<span class="badge ${st}">${st === "running" ? "运行中" : st === "error" ? "出错" : st === "cancelled" ? "已停止" : "空闲"}</span>`;
+    const trusted = S.trusted.has(id) ? `<span class="badge trusted">✓已信任</span>` : "";
+    const title = s.title ? esc(s.title) : esc(String(run ? (run.text || "") : "").slice(0, 40));
+    const rtLabel = rt ? `<span style="color:var(--muted)">${esc(rt.name)}</span>` : "";
+    return `<div class="session-item ${id === S.activeId ? "active" : ""}" onclick="selectSession('${id}')">
+      <div class="row"><span class="sid">${esc(shortId(id))}</span>${badge}${trusted}</div>
+      ${title ? `<div class="title">${title}</div>` : ""}
+      <div class="meta">${rtLabel}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================ session bar / context ============================ */
+function renderSessionBar() {
+  const id = S.activeId;
+  const titleEl = $("sbTitle"), badgeEl = $("sbBadge"), metaEl = $("sbMeta"), ctx = $("ctxLine");
+  if (!id || !S.sessions.has(id)) {
+    titleEl.textContent = "—";
+    badgeEl.innerHTML = "";
+    metaEl.textContent = "";
+    ctx.textContent = "选择或新建一个会话…";
+    return;
+  }
+  const s = S.sessions.get(id);
+  const run = S.runs.get(id);
+  const rt = s.runtimeId ? S.runtimes.get(s.runtimeId) : null;
+  const st = run ? run.status : "idle";
+  const label = {running: "运行中", idle: "空闲", error: "出错", cancelled: "已停止"}[st] || st;
+  titleEl.textContent = s.title || shortId(id);
+  badgeEl.innerHTML = `<span class="badge ${st}">${label}</span>` +
+    (S.trusted.has(id) ? `<span class="badge trusted">✓已信任</span>` : "");
+  metaEl.textContent = `${rt ? rt.name + " · " : ""}${rt && rt.backend ? rt.backend : ""} · ${shortId(id)}`;
+  ctx.innerHTML = `发送到 <span class="ctx-runtime">${rt ? esc(rt.name) : "?"}</span> · 会话 ${esc(shortId(id))}`;
+}
+
+/* ============================ replay（回放，参考 OpenHands rewind） ============================ */
+function enterReplay() {
+  const id = S.activeId;
+  if (!id) return;
+  const total = (S.notifs.get(id) || []).length;
+  if (!total) { toast("该会话还没有可回放的事件"); return; }
+  S.replay = {pos: total, total};
+  const slider = $("rbSlider");
+  slider.max = total;
+  slider.value = total;
+  $("replayBar").style.display = "flex";
+  $("rbLabel").textContent = `⏪ 回放 · 第 ${total} / ${total} 条`;
+  renderTranscript();
+}
+
+function exitReplay() {
+  S.replay = null;
+  $("replayBar").style.display = "none";
+  renderTranscript();
+}
+
+/* ============================ render: transcript ============================ */
+function extractText(data) {
+  // user/message & assistant/message: data.content / data.message.content blocks
+  let content = null;
+  if (data && Array.isArray(data.content)) content = data.content;
+  else if (data && data.message && Array.isArray(data.message.content)) content = data.message.content;
+  const parts = [];
+  const walk = (blocks) => {
+    for (const b of blocks || []) {
+      if (typeof b !== "object" || !b) continue;
+      if (b.type === "text" && typeof b.text === "string") parts.push(b.text);
+      else if (Array.isArray(b.content)) walk(b.content);
+    }
+  };
+  walk(content);
+  return parts.join("\n");
+}
+
+function extractToolResult(data) {
+  // tool/result: data.message.content[].content[].text (type tool-result)
+  if (!data || typeof data !== "object") return null;
+  if (data.message && Array.isArray(data.message.content)) return extractText(data.message);
+  if (typeof data.result === "string") return data.result;
+  if (typeof data.output === "string") return data.output;
+  return null;
+}
+
+/* ============================ render scheduling ============================ */
+// Full re-renders of the transcript/event log are coalesced: bursty streams
+// (assistant/chunk × hundreds) would otherwise rebuild the whole DOM per event
+// and freeze the tab. Chunks themselves take a cheap incremental path.
+let renderTimer = null;
+function scheduleRender() {
+  if (renderTimer) return;
+  renderTimer = setTimeout(() => {
+    renderTimer = null;
+    renderTranscript();
+    renderEvents();
+    renderStats();
+    renderSkills();
+    renderSchedules();
+  }, 120);
+}
+
+// Chunk fast path: append delta text to the live box only, no DOM rebuild.
+function updateLiveChunk(notification) {
+  const ev = notification.payload && typeof notification.payload.event === "object"
+    ? notification.payload.event : null;
+  const chunk = ev && ev.data && typeof ev.data === "object" ? (ev.data.chunk || {}) : {};
+  if (chunk.type === "reasoning-delta" && typeof chunk.delta === "string") {
+    const el = document.querySelector("#transcript .live-thinking");
+    if (el) { el.textContent = (el.textContent + chunk.delta).slice(-600); return; }
+  }
+  scheduleRender();
+}
+
+function renderTranscript() {
+  const id = S.activeId;
+  const box = $("transcript");
+  renderSessionBar();
+  if (!id) {
+    box.innerHTML = '<div id="empty"><div><b>Agent Desktop Workbench</b><br>选择或新建一个会话开始。</div></div>';
+    return;
+  }
+  const notifsAll = S.notifs.get(id) || [];
+  // 回放模式：只看前 pos 条事件（"回退到某一步"的效果）
+  const notifs = S.replay ? notifsAll.slice(0, S.replay.pos) : notifsAll;
+  const run = S.runs.get(id);
+  const sidMeta = S.sessions.get(id);
+  const srt = sidMeta && sidMeta.runtimeId ? S.runtimes.get(sidMeta.runtimeId) : null;
+  const rtLabel = srt ? `${srt.name}${srt.model ? " · " + srt.model : ""}` : "";
+  const WINDOW = 200; // bound the DOM: rebuild only the tail, state from all events
+  const html = [];
+  if (S.replay) {
+    html.push(`<div class="replay-banner">⏪ 回放模式 · 第 ${S.replay.pos} / ${notifsAll.length} 条事件
+      <span style="margin-left:auto;color:var(--muted);font-size:10.5px">拖动下方滑块回看任意一步 · 工具卡片会停留在当时的执行状态</span></div>`);
+  }
+  let lastReason = null;
+  let live = {active: false, reasoning: "", toolArgs: ""};
+  const toolState = new Map(); // callId -> {html, pending}
+
+  notifs.forEach((n, i) => {
+    const inWindow = i >= notifs.length - WINDOW;
+    if (n.method !== "session.event") return;
+    const ev = n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+    if (!ev) return;
+    const type = ev.type || "?";
+    const data = (ev.data && typeof ev.data === "object") ? ev.data : {};
+
+    if (type === "user/message") { if (inWindow) html.push(userMsg(extractText(data), n.ts)); return; }
+    if (type === "assistant/message") {
+      if (inWindow) html.push(assistantMsg(ev, n.ts, rtLabel));
+      live = {active: false, reasoning: "", toolArgs: ""};
+      return;
+    }
+    if (type === "assistant/chunk") {
+      const c = data.chunk || {};
+      live.active = true;
+      if (c.type === "reasoning-delta" && typeof c.delta === "string") live.reasoning += c.delta;
+      if (c.type === "tool-call-delta") live.toolArgs += c.delta || "";
+      return;
+    }
+    if (type === "tool/call") {
+      let args = data.arguments;
+      if (typeof args === "string") { try { args = JSON.parse(args); } catch (_) {} }
+      const card = toolCard(data.name || "tool", args, "pending", data.callId);
+      toolState.set(String(data.callId), {html: card, pending: true, result: null});
+      if (inWindow) html.push(`<div data-tool="${esc(data.callId)}">${card}</div>`);
+      return;
+    }
+    if (type === "tool/result") {
+      const callId = String((data.message && data.message.source && data.message.source.callId) || data.callId || "");
+      const res = extractToolResult(data);
+      if (callId && toolState.has(callId)) {
+        const rendered = toolCard(null, null, res, callId, data.name);
+        const idx = html.findIndex(h => h.includes(`data-tool="${esc(callId)}"`));
+        if (idx >= 0) html[idx] = `<div data-tool="${esc(callId)}">${rendered}</div>`;
+        return;
+      }
+      if (inWindow) html.push(toolCard(data.name || "tool", null, res, callId));
+      return;
+    }
+    if (type === "turn/start") { if (inWindow) html.push(turnDivider("turn start")); return; }
+    if (type === "turn/end") {
+      const reason = (data.reason && typeof data.reason === "object" ? data.reason.kind : null) || data.reason || null;
+      if (inWindow) html.push(turnDivider("turn end", reason));
+      lastReason = reason;
+      return;
+    }
+    if (type === "session/title") {
+      if (data.title) { const s = S.sessions.get(id); if (s) { s.title = data.title; renderSessions(); } }
+      return;
+    }
+    if (type === "agent/status") { if (inWindow) html.push(statusLine(data, n.ts)); return; }
+    // quiet types: agent/inbox/*, session/created, step/*, request/header, request/context, agent/status handled above
+    if (type.startsWith("agent/inbox/") || type.startsWith("step/") || type.startsWith("request/") || type === "session/created" || type === "agent/created" || type === "agent/disposed") return;
+    if (inWindow) html.push(`<div class="status-line" style="margin:6px 0">${esc(type)}</div>`);
+  });
+
+  if (live.active && run && run.status === "running") {
+    html.push(`<div class="status-line"><span class="spinner"></span>agent 正在生成…
+      ${live.reasoning ? `<div class="live-thinking">${esc(live.reasoning.slice(-600))}</div>` : ""}
+    </div>`);
+  }
+  if (run && run.status === "running" && !live.active) html.push(`<div class="status-line"><span class="spinner"></span>agent 正在执行…</div>`);
+  if (run && run.status === "idle") html.push(`<div class="status-line" style="color:var(--ok)">✓ 回合结束${lastReason ? " · " + esc(lastReason) : ""}</div>`);
+  if (run && run.status === "error") html.push(`<div class="status-line" style="color:var(--err)">✗ 运行出错：${esc(run.error || "")}</div>`);
+  if (run && run.status === "cancelled") html.push(`<div class="status-line" style="color:var(--warn)">⏹ 已手动停止（runtime 已重启，会话历史保留）</div>`);
+  $("stop").style.display = (run && run.status === "running") ? "" : "none";
+
+  const nearBottom = box.scrollTop + box.clientHeight > box.scrollHeight - 160;
+  box.innerHTML = html.join("");
+  if (!S.replay && nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+function userMsg(text, ts) {
+  return `<div class="msg user"><div class="who">你 <span class="t">${esc(ts || "")}</span></div><div class="bubble">${esc(text)}</div></div>`;
+}
+
+function assistantMsg(ev, ts, rtLabel) {
+  const data = (ev.data && typeof ev.data === "object") ? ev.data : {};
+  const message = (data.message && typeof data.message === "object") ? data.message : data;
+  const content = Array.isArray(message.content) ? message.content : [];
+  const texts = content.filter(b => b && typeof b === "object" && b.type === "text").map(b => b.text || "");
+  const reasoning = content.filter(b => b && typeof b === "object" && b.type === "reasoning").map(b => b.text || "").join("\n");
+  const usage = data.usage && typeof data.usage === "object"
+    ? `in ${data.usage.inputTokens ?? "?"} · out ${data.usage.outputTokens ?? "?"} · cache ${data.usage.cacheReadTokens ?? "?"} · reasoning ${data.usage.reasoningTokens ?? "?"}`
+    : "";
+  const body = texts.length
+    ? md(texts.join("\n"))
+    : (reasoning ? "" : "<span style='color:var(--muted)'>（assistant 无文本内容）</span>");
+  const reasonHTML = reasoning ? `<details class="reasoning"><summary>🧠 推理过程（${reasoning.length} 字符）</summary><div class="body">${esc(reasoning)}</div></details>` : "";
+  const foot = usage ? `<div class="foot">tokens: ${esc(usage)} · ${esc(ts || "")}</div>` : "";
+  return `<div class="msg assistant"><div class="who">agent${rtLabel ? ` · <span style="color:var(--accent)">${esc(rtLabel)}</span>` : ""} <span class="t">${esc(ts || "")}</span></div>
+    <div class="bubble">${body}${reasonHTML}</div>${foot}</div>`;
+}
+
+function looksLikeDiff(text) {
+  const lines = String(text).split("\n").slice(0, 200);
+  let plus = 0, minus = 0, hunk = 0, hasHeader = false;
+  for (const l of lines) {
+    if (l.startsWith("diff --git") || l.startsWith("+++ ") || l.startsWith("--- ")) hasHeader = true;
+    else if (l.startsWith("@@")) hunk++;
+    else if (l.startsWith("+")) plus++;
+    else if (l.startsWith("-")) minus++;
+  }
+  return (plus > 2 && minus > 2) || (hunk >= 1 && plus >= 1 && minus >= 1) || hasHeader;
+}
+
+function renderDiff(text) {
+  return '<div class="diff-view">' + String(text).split("\n").map(l => {
+    let cls = "";
+    if (l.startsWith("+++") || l.startsWith("---") || l.startsWith("diff --git") ||
+        l.startsWith("index ") || l.startsWith("new file") || l.startsWith("deleted file") ||
+        l.startsWith("rename from") || l.startsWith("rename to")) cls = "diff-hdr";
+    else if (l.startsWith("@@")) cls = "diff-hunk";
+    else if (l.startsWith("+")) cls = "diff-add";
+    else if (l.startsWith("-")) cls = "diff-del";
+    return `<div class="${cls}">${esc(l)}</div>`;
+  }).join("") + '</div>';
+}
+
+function toolCard(name, args, result, callId, nameFromResult) {
+  const toolName = name || nameFromResult || "tool";
+  const res = (result === null || result === undefined) ? null : (typeof result === "string" ? result : pretty(result));
+  const stClass = res === null ? "pending" : "";
+  const stText = res === null ? "执行中…" : "完成";
+  const argsBlock = args !== null && args !== undefined ? `<div class="k">参数</div><pre>${esc(typeof args === "string" ? args : pretty(args))}</pre>` : "";
+  let resBlock = "";
+  if (res !== null) {
+    const truncated = String(res).slice(0, 4000);
+    resBlock = `<div class="k">结果</div>` + (looksLikeDiff(truncated) ? renderDiff(truncated) : `<pre>${esc(truncated)}</pre>`);
+  }
+  return `<div class="tool-card">
+    <div class="head" onclick="this.parentElement.classList.toggle('open')">
+      <span class="tw ${stClass}"></span><span class="name">${esc(toolName)}</span>
+      ${callId ? `<span class="status">${esc(String(callId).slice(0, 18))}</span>` : ""}
+      <span class="status">${stText}</span>
+    </div>
+    <div class="body">${argsBlock}${resBlock}</div>
+  </div>`;
+}
+
+function turnDivider(label, reason) {
+  return `<div class="turn-divider">${esc(label)}${reason ? `<span class="reason">${esc(reason)}</span>` : ""}</div>`;
+}
+
+function statusLine(data, ts) {
+  const s = (data && (data.status || data.state)) || "?";
+  return `<div class="status-line"><span class="spinner" style="display:${s === "idle" ? "none" : "inline-block"}"></span>agent 状态：${esc(s)}<span style="margin-left:auto;font-family:var(--mono);font-size:10px">${esc(ts || "")}</span></div>`;
+}
+
+/* ============================ render: skills ============================ */
+function extractSkills() {
+  const id = S.activeId;
+  const skills = new Map();
+  const notifs = S.notifs.get(id) || [];
+  for (const n of notifs) {
+    if (n.method !== "session.event") continue;
+    const ev = n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+    if (!ev || ev.type !== "user/message") continue;
+    const hay = JSON.stringify(ev.data || {});
+    const m = hay.match(/<available_skills>([\s\S]*?)<\/available_skills>/);
+    if (!m) continue;
+    const re = /-\s*`([^`]+)`\s*:\s*([^\n\\]+)/g;
+    let mm;
+    while ((mm = re.exec(m[1]))) {
+      const name = mm[1].trim();
+      const desc = mm[2].trim();
+      if (name && !skills.has(name)) skills.set(name, desc);
+    }
+  }
+  return skills;
+}
+
+function renderSkills() {
+  const box = $("tabSkills");
+  const id = S.activeId;
+  if (!id) {
+    box.innerHTML = '<div class="empty-note">选择一个会话以查看它的技能目录。</div>';
+    return;
+  }
+  const skills = extractSkills();
+  if (!skills.size) {
+    box.innerHTML = '<div class="empty-note">该会话还没有技能目录数据（技能目录随首次任务注入）。<br>发一个任务后，这里会列出 runtime 可用的 skills。</div>';
+    return;
+  }
+  box.innerHTML = [...skills.entries()].map(([name, desc]) => `
+    <div class="request-card">
+      <div class="method" style="color:var(--accent)">🧠 ${esc(name)}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;max-height:64px;overflow:hidden">${esc(desc)}</div>
+      <div class="actions">
+        <button class="btn primary small" onclick="loadSkill(${JSON.stringify(name)})">让 agent 加载</button>
+      </div>
+    </div>`).join("");
+}
+
+async function loadSkill(name) {
+  const id = S.activeId;
+  const rid = runtimeOfSession(id);
+  if (!rid || !id) { toast("没有可用的会话"); return; }
+  const text = `请用 skill 工具加载 \`${name}\` 技能，然后一句话说明它能做什么。`;
+  try {
+    const res = await fetch(`/api/runtimes/${rid}/run`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: id, text}),
+    });
+    const b = await res.json();
+    if (!res.ok) { toast(b.error || "加载失败"); return; }
+    toast(`已让 agent 加载「${name}」`);
+  } catch (e) { toast("请求失败: " + e); }
+}
+
+/* ============================ render: schedules ============================ */
+function renderSchedules() {
+  const box = $("tabSchedules");
+  const items = [...S.schedules.values()];
+  if (!items.length) {
+    box.innerHTML = '<div class="empty-note">还没有定时任务。<br>让 agent 在指定时间自动干活（参考 OpenClaw 的 cron）。</div>';
+    return;
+  }
+  box.innerHTML = items.map(t => {
+    const rt = S.runtimes.get(t.runtime_id);
+    const sched = t.interval_minutes != null
+      ? `每 ${t.interval_minutes} 分钟`
+      : (t.daily ? `每天 ${t.daily}` : "?");
+    return `<div class="request-card">
+      <div class="method">⏰ ${esc(sched)}${t.enabled ? "" : " · 已暂停"}</div>
+      <div style="font-size:11.5px;margin-top:5px">${esc(String(t.text).slice(0, 80))}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">
+        ${esc(rt ? rt.name : t.runtime_id)} · ${esc(String(t.session_id).slice(-8))} · 上次 ${esc(t.last_run || "—")}
+      </div>
+      <div class="actions">
+        <button class="btn small" onclick="toggleSchedule('${t.id}')">${t.enabled ? "暂停" : "启用"}</button>
+        <button class="btn small" onclick="deleteSchedule('${t.id}')">删除</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function newSchedule() {
+  const rid = activeRuntimeId();
+  if (!rid) { alert("请先创建一个运行时"); return; }
+  const interval = prompt("间隔分钟数（如 30；留空则用每日时间）:", "");
+  if (interval === null) return;
+  let daily = null;
+  if (!interval.trim()) {
+    daily = prompt("每日触发时间（HH:MM，如 09:00）:", "09:00");
+    if (daily === null) return;
+  }
+  const text = prompt("任务内容:", "");
+  if (text === null || !text.trim()) return;
+  const sid = prompt("会话 id（回车用当前会话）:", S.activeId || "");
+  try {
+    const res = await fetch("/api/schedules", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        runtime_id: rid, session_id: sid, text,
+        interval_minutes: interval.trim() ? Number(interval) : undefined,
+        daily,
+      }),
+    });
+    const b = await res.json();
+    if (!res.ok) { alert(b.error || "创建失败"); return; }
+    toast("⏰ 定时任务已创建");
+  } catch (e) { alert("请求失败: " + e); }
+}
+
+async function toggleSchedule(id) {
+  const rid = activeRuntimeId();
+  await fetch(`/api/schedules/${id}/toggle`, {method: "POST"});
+  renderSchedules();
+}
+
+async function deleteSchedule(id) {
+  if (!confirm("删除这个定时任务？")) return;
+  await fetch(`/api/schedules/${id}`, {method: "DELETE"});
+  renderSchedules();
+}
+
+/* ============================ render: stats ============================ */
+function renderStats() {
+  const box = $("tabStats");
+  let sessions = 0, events = 0, tools = 0;
+  const tok = {input: 0, output: 0, cache: 0, reasoning: 0};
+  const perRuntime = new Map();
+  for (const [sid, arr] of S.notifs) {
+    sessions++;
+    const rs = S.sessions.get(sid);
+    const rid = rs && rs.runtimeId;
+    if (!perRuntime.has(rid)) perRuntime.set(rid, {label: (S.runtimes.get(rid) || {}).name || rid || "?", sessions: 0, events: 0, tools: 0, input: 0, output: 0, cache: 0, reasoning: 0});
+    const pr = perRuntime.get(rid);
+    pr.sessions++;
+    for (const n of arr) {
+      events++;
+      const ev = n.method === "session.event" && n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+      if (!ev) continue;
+      const t = ev.type;
+      if (t.startsWith("tool/")) { tools++; pr.tools++; }
+      if (t === "assistant/message" && ev.data && ev.data.usage) {
+        const u = ev.data.usage;
+        tok.input += u.inputTokens || 0; tok.output += u.outputTokens || 0;
+        tok.cache += u.cacheReadTokens || 0; tok.reasoning += u.reasoningTokens || 0;
+        pr.input += u.inputTokens || 0; pr.output += u.outputTokens || 0;
+        pr.cache += u.cacheReadTokens || 0; pr.reasoning += u.reasoningTokens || 0;
+      }
+    }
+  }
+  const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+  // 估算成本（DeepSeek 官方参考价：输入 ¥2/百万 token，输出 ¥8/百万，缓存命中 ¥0.5/百万）
+  const costIn = tok.input / 1e6 * 2, costOut = tok.output / 1e6 * 8, costCache = tok.cache / 1e6 * 0.5;
+  const statCard = (label, value) => `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:7px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">${label}</div>
+    <div style="font-size:15px;font-weight:700;color:var(--accent);margin-top:2px">${value}</div></div>`;
+  const rows = [...perRuntime.values()].map(pr => `<tr>
+    <td style="padding:3px 6px;color:var(--accent)">${esc(pr.label)}</td>
+    <td style="padding:3px 6px">${pr.sessions}</td>
+    <td style="padding:3px 6px">${pr.events}</td>
+    <td style="padding:3px 6px">${pr.tools}</td>
+    <td style="padding:3px 6px;font-family:var(--mono);font-size:11px">${fmt(pr.input)} / ${fmt(pr.output)} / ${fmt(pr.cache)} / ${fmt(pr.reasoning)}</td>
+  </tr>`).join("");
+  // 成本告警（参考 Langfuse budget）：超过阈值弹 toast + 卡片标红
+  const totalCost = costIn + costOut + costCache;
+  if (S.costAlert.lastBelow && totalCost > S.costAlert.threshold) {
+    S.costAlert.lastBelow = false;
+    toast(`⚠ 估算成本超过阈值 ¥${S.costAlert.threshold.toFixed(2)}（当前 ¥${totalCost.toFixed(2)}）`);
+  } else if (totalCost <= S.costAlert.threshold) {
+    S.costAlert.lastBelow = true;
+  }
+  const costCardStyle = totalCost > S.costAlert.threshold
+    ? 'style="border:1px solid var(--err)"'
+    : "";
+  box.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
+      ${statCard("会话数", sessions)}
+      ${statCard("事件总数", fmt(events))}
+      ${statCard("工具调用", tools)}
+      ${statCard("运行时", S.runtimes.size)}
+    </div>
+    ${statCard("Token（输入 / 输出 / 缓存 / 推理）", `${fmt(tok.input)} / ${fmt(tok.output)} / ${fmt(tok.cache)} / ${fmt(tok.reasoning)}`)}
+    <div ${costCardStyle}>${statCard("估算成本（¥，参考价）", `${totalCost.toFixed(3)}（输入 ${costIn.toFixed(2)} + 输出 ${costOut.toFixed(2)} + 缓存 ${costCache.toFixed(2)}）`)}
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">
+        告警阈值 ¥${S.costAlert.threshold.toFixed(2)}
+        <button class="btn small" id="costThresholdBtn" style="margin-left:6px">调整</button>
+        ${totalCost > S.costAlert.threshold ? '<span style="color:var(--err)">⚠ 已超阈值</span>' : ""}
+      </div>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);margin:8px 0 4px">按运行时明细</div>
+    <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <tr style="color:var(--muted)"><td style="padding:3px 6px">运行时</td><td style="padding:3px 6px">会话</td><td style="padding:3px 6px">事件</td><td style="padding:3px 6px">工具</td><td style="padding:3px 6px">in/out/cache/reason</td></tr>
+      ${rows || '<tr><td colspan="5" style="color:var(--muted);padding:6px">暂无数据</td></tr>'}
+    </table>`;
+  const btn = $("costThresholdBtn");
+  if (btn && !btn._wired) {
+    btn._wired = true;
+    btn.onclick = () => {
+      const v = prompt("成本告警阈值（¥，参考价）：", String(S.costAlert.threshold));
+      if (v === null) return;
+      const n = parseFloat(v);
+      if (!isFinite(n) || n <= 0) { toast("阈值必须是正数"); return; }
+      S.costAlert.threshold = n;
+      S.costAlert.lastBelow = true;
+      localStorage.setItem("wb.costThreshold", String(n));
+      renderStats();
+      toast(`成本阈值已设为 ¥${n.toFixed(2)}`);
+    };
+  }
+}
+
+/* ============================ render: event log ============================ */
+function evTypeOf(n) {
+  if (n.method !== "session.event" || !n.payload || typeof n.payload.event !== "object") return null;
+  return n.payload.event.type || null;
+}
+
+function logRow(n) {
+  const ev = n.method === "session.event" && n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+  const evType = ev ? ev.type : "";
+  const cat = evType
+    ? (evType.startsWith("tool/") ? "tool"
+      : evType === "user/message" || evType === "assistant/message" || evType === "assistant/chunk" ? "msg"
+      : evType.startsWith("turn/") ? "turn"
+      : "other")
+    : (n.method === "subagent.started" || n.method === "subagent.finished") ? "sub" : "other";
+  return `<div class="log-item"><div class="head" onclick="this.parentElement.classList.toggle('open')">
+    <span class="dot-cat cat-${cat}"></span>
+    <span class="method">${esc(n.method)}</span>
+    ${evType ? `<span class="badge idle">${esc(evType)}</span>` : ""}
+    <span class="time">${esc(n.ts || "")} · r${esc(String(n.runId || "").slice(0, 5))}</span>
+  </div><pre>${esc(pretty(n.payload))}</pre></div>`;
+}
+
+function chunkRow(items) {
+  const first = items[0], last = items[items.length - 1];
+  const body = items.map(n => `<div style="padding:2px 0;font-size:10px;color:var(--muted)">${esc(pretty(n.payload))}</div>`).join("");
+  return `<div class="log-item grouped"><div class="head" onclick="this.parentElement.classList.toggle('open')">
+    <span class="dot-cat cat-msg"></span>
+    <span class="method">assistant/chunk</span>
+    <span class="count-badge">×${items.length}</span>
+    <span class="time">${esc(first.ts || "")} – ${esc(last.ts || "")} · r${esc(String(first.runId || "").slice(0, 5))}</span>
+  </div><div style="border-top:1px solid var(--border);max-height:300px;overflow-y:auto;display:none;padding:6px 9px">${body}</div></div>`;
+}
+
+function renderEvents() {
+  const box = $("evList");
+  if (!box) return;
+  const id = S.activeId;
+  const notifs = S.notifs.get(id) || [];
+  const f = S.evFilter;
+  const nearBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+
+  let items = notifs;
+  if (f.search) {
+    const q = f.search.toLowerCase();
+    items = items.filter(n => {
+      const ev = n.method === "session.event" && n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+      const hay = (n.method + " " + (ev ? ev.type : "") + " " + JSON.stringify(n.payload)).toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  const cat = f.cat;
+  if (cat !== "all") {
+    items = items.filter(n => {
+      const ev = n.method === "session.event" && n.payload && typeof n.payload.event === "object" ? n.payload.event : null;
+      const t = ev ? ev.type : "";
+      if (cat === "tools") return t.startsWith("tool/");
+      if (cat === "messages") return t === "user/message" || t === "assistant/message" || t === "assistant/chunk";
+      if (cat === "subagents") return n.method === "subagent.started" || n.method === "subagent.finished";
+      // important: drop noise
+      if (["assistant/chunk", "agent/inbox/spliced", "request/header", "request/context",
+           "step/start", "step/end", "session/created", "agent/created", "agent/disposed",
+           "session/status"].includes(t)) return false;
+      return true;
+    });
+  }
+
+  if (!items.length) {
+    box.innerHTML = `<div class="ev-count">0 / ${notifs.length} 条</div>` +
+      `<div class="empty-note">${notifs.length ? "没有匹配当前筛选的事件。" : "尚无事件。运行任务后这里会实时出现事件流。"}</div>`;
+    updateLatestBtn(box);
+    return;
+  }
+
+  // Bound the DOM: render only the tail (the count line still reflects all).
+  const TAIL = 300;
+  items = items.slice(-TAIL);
+
+  // group consecutive assistant/chunk runs into one row
+  const rows = [];
+  let run = null;
+  for (const n of items) {
+    const t = evTypeOf(n);
+    if (f.collapseChunks && t === "assistant/chunk") {
+      if (!run) { run = []; rows.push(run); }
+      run.push(n);
+      continue;
+    }
+    run = null;
+    rows.push(n);
+  }
+
+  const html = rows.map(r => Array.isArray(r) ? chunkRow(r) : logRow(r)).join("");
+  box.innerHTML = `<div class="ev-count">显示 ${items.length} / ${notifs.length} 条${f.search ? " · 搜索: " + esc(f.search) : ""}</div>` + html;
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+  updateLatestBtn(box);
+}
+
+function updateLatestBtn(box) {
+  const btn = $("toLatest");
+  if (!btn) return;
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 60;
+  btn.style.display = atBottom ? "none" : "block";
+}
+
+/* ============================ render: subagents ============================ */
+function renderSubagents() {
+  const box = $("tabSubagents");
+  const entries = [...S.subagents.entries()];
+  if (!entries.length) { box.innerHTML = '<div class="empty-note">尚无子代理活动。让 agent 委派任务时会在这里长出一棵会话树。</div>'; return; }
+  const byParent = new Map();
+  for (const [child, info] of entries) {
+    if (!byParent.has(info.parentId)) byParent.set(info.parentId, []);
+    byParent.get(info.parentId).push([child, info]);
+  }
+  function walk(parent, depth) {
+    const kids = byParent.get(parent) || [];
+    let out = "";
+    for (const [child, info] of kids) {
+      out += `<div class="tree-node ${info.status}" style="margin-left:${depth * 18}px">
+        <span class="sid">${shortId(child)}</span>
+        <span class="rel">${info.status === "done" ? "✓ done" : "● running"} ${esc(info.ts || "")}</span>
+      </div>`;
+      out += walk(child, depth + 1);
+    }
+    return out;
+  }
+  box.innerHTML = `<div class="tree-node"><span class="sid">root · ${esc(shortId(S.activeId || ""))}</span></div>`
+    + entries.filter(([, info]) => !byParent.has(info.parentId) || info.parentId === "null" || info.parentId === "undefined")
+      .map(([c, i]) => walk(c, 1)).join("");
+}
+
+/* ============================ render: requests ============================ */
+function renderRequests() {
+  const box = $("tabRequests");
+  const approvals = [...S.approvals.values()];
+  const items = [...S.requests.values()];
+  const badge = $("reqBadge");
+  if (approvals.length) { badge.style.display = ""; badge.textContent = approvals.length; }
+  else badge.style.display = "none";
+  if (!approvals.length && !items.length) {
+    box.innerHTML = '<div class="empty-note">没有待处理的审批 / 运行时请求。<br>agent 调用被闸门拦截的工具时会弹出提示。</div>';
+    return;
+  }
+  const trustedNote = S.activeId && S.trusted.has(S.activeId)
+    ? `<div style="font-size:10.5px;color:var(--ok);padding:6px 4px 2px">✓ 当前会话已信任：bash 调用自动放行，不再打扰</div>` : "";
+  const approvalCards = approvals.map(a => `
+    <div class="request-card" style="border-color:var(--warn)">
+      <div class="method">🔐 审批请求 · ${esc(a.toolName || "tool")}</div>
+      ${a.reason ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px">${esc(String(a.reason).slice(0, 300))}</div>` : ""}
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">session ${esc(String(a.agentSession || "").slice(-8) || "?")} · ${esc(a.ts || "")} · id ${esc(String(a.id))}</div>
+      <div class="actions">
+        <button class="btn primary small" onclick="resolveApproval('${a.id}', 'allow')">允许执行</button>
+        <button class="btn small" style="color:var(--ok);border-color:var(--ok)" onclick="resolveApproval('${a.id}', 'allow', true)">信任本会话</button>
+        <button class="btn small" onclick="resolveApproval('${a.id}', 'deny')">拒绝</button>
+      </div>
+    </div>`).join("");
+  const reqCards = items.map(r => `
+    <div class="request-card">
+      <div class="method">${esc(r.method)}</div>
+      <pre>${esc(pretty(r.payload))}</pre>
+      <div class="actions">
+        <button class="btn primary small" onclick="resolveRequest('${r.id}', true)">批准</button>
+        <button class="btn small" onclick="resolveRequest('${r.id}', false)">拒绝</button>
+      </div>
+    </div>`).join("");
+  box.innerHTML = trustedNote + approvalCards + reqCards;
+}
+
+/* ============================ actions ============================ */
+function activeRuntimeId() {
+  return S.activeRuntime || (S.runtimes.size ? [...S.runtimes.keys()][0] : null);
+}
+
+async function newRuntime() {
+  const name = prompt("运行时名称（可选）:", "runtime-" + Math.random().toString(16).slice(2, 6));
+  if (name === null) return;
+  const backend = prompt("后端类型：harness / codex / claude / gemini / qwen / aider", "harness");
+  if (backend === null) return;
+  const VALID = ["harness", "codex", "claude", "gemini", "qwen", "aider"];
+  if (!VALID.includes(backend)) { alert("后端类型必须是：" + VALID.join(" / ")); return; }
+  try {
+    const res = await fetch("/api/runtimes", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name, backend}),
+    });
+    const body = await res.json();
+    if (!res.ok) { alert(body.error || "create failed"); return; }
+    toast(`runtime 已创建（${backend} 后端）`);
+  } catch (e) { alert("请求失败: " + e); }
+}
+
+function newSession() {
+  const rid = activeRuntimeId();
+  if (!rid) { alert("请先创建一个运行时"); return; }
+  const id = "session-" + Math.random().toString(16).slice(2, 12);
+  S.sessions.set(id, {id, runtimeId: rid, created: Date.now()});
+  selectSession(id);
+}
+
+async function sendPrompt() {
+  const inp = $("input");
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = "";
+  autoGrow();
+  let id = S.activeId;
+  let rid = activeRuntimeId();
+  if (!rid) { alert("请先创建一个运行时"); return; }
+  if (id && S.sessions.has(id)) rid = S.sessions.get(id).runtimeId || rid;
+  if (!id) {
+    id = "session-" + Math.random().toString(16).slice(2, 12);
+    S.sessions.set(id, {id, runtimeId: rid, created: Date.now()});
+  }
+  S.activeId = id;
+  try {
+    const res = await fetch(`/api/runtimes/${rid}/run`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: id, text}),
+    });
+    const body = await res.json();
+    if (!res.ok) { alert(body.error || "run failed"); return; }
+    renderSessions();
+  } catch (e) { alert("请求失败: " + e); }
+}
+
+function runtimeOfSession(sessionId) {
+  const s = S.sessions.get(sessionId);
+  if (s && s.runtimeId) return s.runtimeId;
+  return activeRuntimeId();
+}
+
+async function resolveRequest(requestId, approved) {
+  const rid = activeRuntimeId();
+  if (!rid) return;
+  await fetch(`/api/runtimes/${rid}/respond`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({request_id: requestId, result: {approved}}),
+  });
+  renderRequests();
+}
+
+async function resolveApproval(id, decision, trust) {
+  const a = S.approvals.get(String(id));
+  const rid = runtimeOfSession(a && a.agentSession);
+  if (!rid) return;
+  try {
+    await fetch(`/api/runtimes/${rid}/approval`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({id, decision, trust: !!trust}),
+    });
+  } catch (_) {}
+  renderRequests();
+}
+
+/* ============================ approval modal ============================ */
+function showApprovalModal(id) {
+  const key = String(id);
+  if (!S.approvals.has(key)) return;
+  if (S.modalCurrent) { if (!S.modalQueue.includes(key)) S.modalQueue.push(key); return; }
+  renderApprovalModal(key);
+}
+
+function renderApprovalModal(key) {
+  const a = S.approvals.get(key);
+  if (!a) return;
+  S.modalCurrent = key;
+  $("amTool").textContent = `${a.toolName || "tool"} · 会话 ${shortId(a.agentSession || "")}`;
+  $("amReason").textContent = (a.reason && String(a.reason).trim()) ? String(a.reason).slice(0, 400) : "（agent 未说明原因）";
+  $("amMeta").textContent = `id ${key} · ${a.ts || ""}`;
+  $("approvalModal").classList.add("open");
+}
+
+function closeApprovalModal() {
+  S.modalCurrent = null;
+  $("approvalModal").classList.remove("open");
+  if (S.modalQueue.length) {
+    const next = S.modalQueue.shift();
+    if (S.approvals.has(next)) renderApprovalModal(next);
+  }
+}
+
+$("amAllow").onclick = () => { const id = S.modalCurrent; if (id) resolveApproval(id, "allow", false); };
+$("amTrust").onclick = () => { const id = S.modalCurrent; if (id) resolveApproval(id, "allow", true); };
+$("amDeny").onclick = () => { const id = S.modalCurrent; if (id) resolveApproval(id, "deny", false); };
+
+let toastTimer = null;
+function toast(text) {
+  const el = $("toast");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+async function stopSession() {
+  const id = S.activeId;
+  const rid = runtimeOfSession(id);
+  if (!rid || !id) return;
+  try {
+    await fetch(`/api/runtimes/${rid}/cancel`, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: id}),
+    });
+    toast("⏹ 已请求停止，runtime 正在重启…");
+  } catch (_) {}
+}
+
+/* ============================ 大肥鱼桌宠 ============================ */
+const PET = {
+  state: "idle",
+  bubbleTimer: null,
+  revertTimer: null,
+  sleepTimer: null,
+  sleepAfterMs: 45000,
+  lines: {
+    idle: ["摸鱼中…", "今天也是深潜的一天", "要不要给我投喂点任务？", "呼——", "盯……", "鱼生圆满"],
+    thinking: ["让我想想…", "思考中，别吵", "鱼脑高速运转！", "嗯……有意思", "正在深海检索…", "这个有点复杂"],
+    tool: ["工具来咯！", "我跑一下工具！", "bash 启动！", "操作中……", "翻翻工具箱"],
+    approval: ["等你批准哦～", "这步要你点头！", "批准一下嘛～", "举手提问！"],
+    done: ["搞定！", "完美收工！", "小菜一碟～", "奖励我一条小鱼干吧", "✓ 完成！"],
+    error: ["呜…出错了", "这题有点难…", "再给我一次机会！"],
+    cancelled: ["被叫停了…", "好的好的，不干了", "那我先歇会儿"],
+    sleep: ["呼噜……", "zzz…", "梦里也是小鱼干…", "…呼…"],
+  },
+};
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function petSay(text, ms = 2600) {
+  const b = $("petBubble");
+  b.textContent = text;
+  b.classList.add("show");
+  clearTimeout(PET.bubbleTimer);
+  PET.bubbleTimer = setTimeout(() => b.classList.remove("show"), ms);
+}
+
+function petSet(state, text) {
+  const el = $("pet");
+  PET.state = state;
+  el.classList.remove("idle", "thinking", "tool", "approval", "done", "error", "cancelled", "sleep");
+  el.classList.add(state);
+  if (text) petSay(text);
+  // 朝向右侧操作面板（工具/审批时侧身）——仅精灵模式
+  const img = $("petImg");
+  if (!PETL2D.active) img.style.transform = (state === "tool" || state === "approval") ? "scaleX(-1)" : "";
+  $("petSleep").style.display = state === "sleep" ? "block" : "none";
+  clearTimeout(PET.sleepTimer);
+  clearTimeout(PET.revertTimer);
+  if (state === "idle") {
+    PET.sleepTimer = setTimeout(() => petSet("sleep", pick(PET.lines.sleep)), PET.sleepAfterMs);
+  } else if (state === "sleep") {
+    // stays sleeping
+  } else {
+    PET.revertTimer = setTimeout(() => petSet("idle", ""), 9000); // 干完活回到待机
+  }
+  PETL2D.setState(state);
+}
+
+function petWake(text) {
+  petSet("idle", text || pick(PET.lines.idle));
+}
+
+function petOnRun(msg) {
+  if (msg.status === "started") petSet("thinking", "收到新任务！");
+  else if (msg.status === "enqueued") petSay("开工开工！");
+  else if (msg.status === "idle") petSet("done", pick(PET.lines.done));
+  else if (msg.status === "error") petSet("error", pick(PET.lines.error));
+  else if (msg.status === "cancelled") petSet("cancelled", pick(PET.lines.cancelled));
+}
+
+function petOnNotification(msg) {
+  const ev = msg.notification.payload && typeof msg.notification.payload.event === "object"
+    ? msg.notification.payload.event : null;
+  const t = ev ? ev.type : msg.notification.method;
+  if (t === "tool/call") petSet("tool", pick(PET.lines.tool));
+  else if (t === "assistant/chunk") {
+    if (Math.random() < 0.12) petSay(pick(PET.lines.thinking), 1600); // 偶尔冒心声
+  } else if (t === "turn/end" && PET.state === "thinking") {
+    petSet("idle", "");
+  }
+}
+
+function petDropFile(file) {
+  if (!file) return;
+  if (file.size > 20 * 1024 * 1024) { petSay("文件太大啦（>20MB）", 3200); return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const b64 = reader.result.split(",")[1];
+    const rid = activeRuntimeId();
+    if (!rid) { petSay("没有可用的运行时…", 3000); return; }
+    petSet("thinking", `收到《${file.name}》！开工！`);
+    try {
+      const res = await fetch(`/api/runtimes/${rid}/files`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          filename: file.name,
+          content: b64,
+          session_id: "pet-task-" + Date.now().toString(16),
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) { petSet("error", body.error || "处理失败"); return; }
+      petSay("文件收到，正在处理～");
+    } catch (err) { petSet("error", "连接失败: " + err); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function wirePet() {
+  const el = $("pet");
+  el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("dragover"); });
+  el.addEventListener("dragleave", () => el.classList.remove("dragover"));
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    el.classList.remove("dragover");
+    if (e.dataTransfer.files.length) petDropFile(e.dataTransfer.files[0]);
+  });
+  el.addEventListener("click", (e) => {
+    if (e.target === $("petMode")) return;
+    petWake(pick(PET.lines.idle));
+    el.classList.add("done");
+    setTimeout(() => el.classList.remove("done"), 700);
+  });
+  $("petMode").onclick = (e) => {
+    e.stopPropagation();
+    if (PETL2D.active) { PETL2D.hide(); $("petMode").classList.remove("on"); petSay("回到大肥鱼精灵～"); }
+    else { PETL2D.enable().then(() => $("petMode").classList.add("on")); }
+  };
+  $("petFeed").onclick = (e) => {
+    e.stopPropagation();
+    petSet("done", pick(["好吃！", "再来一条小鱼干～", "投喂成功，干劲满满！", "吃饱了，开工！"]));
+  };
+  petSet("idle", "你好呀，我是大肥鱼～");
+}
+
+/* ============ Live2D 模式（Haru 免费模型，来自 dsh-live2d-pet，MIT） ============ */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("加载失败: " + src));
+    document.head.appendChild(s);
+  });
+}
+
+const PETL2D = {
+  active: false,
+  ready: false,
+  model: null,
+  app: null,
+  baseScale: 1,
+  async enable() {
+    if (this.ready) { this.show(); this.setState(PET.state); return; }
+    petSay("加载 Live2D 引擎中…", 2000);
+    try {
+      await loadScript("/static/vendor/live2d/assets/live2d/live2dcubismcore.min.js");
+      await loadScript("/static/vendor/live2d/pixi.min.js");
+      await loadScript("/static/vendor/live2d/pixi-live2d-display.min.js");
+      this.app = new PIXI.Application({ width: 150, height: 190, backgroundAlpha: 0, autoStart: true });
+      $("petL2D").appendChild(this.app.view);
+      const url = "/static/vendor/live2d/assets/live2d/haru/haru_greeter_t03.model3.json";
+      this.model = await Live2DModel.from(url, { autoInteract: false });
+      this.app.stage.addChild(this.model);
+      const w = this.model.internalModel.width;
+      const h = this.model.internalModel.height;
+      this.baseScale = Math.min(150 / w, 190 / h) * 0.92;
+      this.model.anchor.set(0.5, 1);
+      this.ready = true;
+      this.show();
+      this.setState(PET.state);
+      petSay("Live2D 模式开启！点 🎀 切回大肥鱼", 3000);
+    } catch (err) {
+      petSay("Live2D 加载失败：" + err.message, 4000);
+    }
+  },
+  show() {
+    this.active = true;
+    $("petImg").style.display = "none";
+    $("petL2D").style.display = "block";
+  },
+  hide() {
+    this.active = false;
+    $("petL2D").style.display = "none";
+    $("petImg").style.display = "";
+  },
+  setState(state) {
+    if (!this.ready || !this.model) return;
+    const map = {
+      idle:      { motion: "Idle", expr: "f01", scale: 1, alpha: 1 },
+      thinking:  { motion: "Idle", expr: "f04", scale: 1, alpha: 1 },
+      tool:      { motion: "Tap",  expr: "f03", scale: 1, alpha: 1 },
+      approval:  { motion: "Tap",  expr: "f02", scale: 1.05, alpha: 1 },
+      done:      { motion: "Tap",  expr: "f01", scale: 1, alpha: 1 },
+      error:     { motion: "Idle", expr: "f02", scale: 0.95, alpha: 0.9 },
+      cancelled: { motion: "Idle", expr: "f02", scale: 0.95, alpha: 0.9 },
+      sleep:     { motion: "Idle", expr: "f07", scale: 0.85, alpha: 0.75 },
+    };
+    const c = map[state] || map.idle;
+    const m = this.model;
+    try { m.motion(c.motion); } catch (_) {}
+    try { m.expression(c.expr); } catch (_) {}
+    m.scale.set(c.scale * this.baseScale);
+    m.alpha = c.alpha;
+  },
+};
+
+async function exportSession() {
+  const id = S.activeId;
+  const rid = runtimeOfSession(id);
+  if (!rid || !id) { toast("没有可导出的会话"); return; }
+  try {
+    const res = await fetch(`/api/runtimes/${rid}/sessions/${id}/export`);
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || "导出失败"); return; }
+    const blob = new Blob([data.markdown], {type: "text/markdown;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${id}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("会话已导出：" + a.download);
+  } catch (e) { toast("导出失败: " + e); }
+}
+
+function autoGrow() {
+  const inp = $("input");
+  inp.style.height = "auto";
+  inp.style.height = Math.min(inp.scrollHeight, 180) + "px";
+}
+
+/* ============================ wiring ============================ */
+$("send").onclick = sendPrompt;
+$("stop").onclick = stopSession;
+$("exportSession").onclick = exportSession;
+$("replayBtn").onclick = enterReplay;
+$("rbExit").onclick = exitReplay;
+$("rbSlider").addEventListener("input", () => {
+  if (!S.replay) return;
+  S.replay.pos = +$("rbSlider").value;
+  $("rbLabel").textContent = `⏪ 回放 · 第 ${S.replay.pos} / ${S.replay.total} 条`;
+  renderTranscript();
+});
+$("newSession").onclick = newSession;
+$("newRuntime").onclick = newRuntime;
+$("runtimeSelect").onchange = (e) => {
+  S.activeRuntime = e.target.value || null;
+  renderHeaderStatus();
+};
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt(); }
+});
+$("input").addEventListener("input", autoGrow);
+$("evSearch").addEventListener("input", () => {
+  S.evFilter.search = $("evSearch").value;
+  renderEvents();
+});
+$("sessionSearch").addEventListener("input", () => {
+  S.sessionFilter = $("sessionSearch").value;
+  renderSessions();
+});
+function applyCollapse() {
+  document.body.classList.toggle("collapse-left", localStorage.getItem("wb.collapseLeft") === "1");
+  document.body.classList.toggle("collapse-right", localStorage.getItem("wb.collapseRight") === "1");
+}
+$("toggleLeft").onclick = () => {
+  const v = document.body.classList.toggle("collapse-left");
+  localStorage.setItem("wb.collapseLeft", v ? "1" : "0");
+};
+$("toggleRight").onclick = () => {
+  const v = document.body.classList.toggle("collapse-right");
+  localStorage.setItem("wb.collapseRight", v ? "1" : "0");
+};
+applyCollapse();
+document.querySelectorAll(".ev-chips .chip").forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll(".ev-chips .chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    S.evFilter.cat = chip.dataset.cat;
+    renderEvents();
+  };
+});
+$("collapseChunks").addEventListener("change", () => {
+  S.evFilter.collapseChunks = $("collapseChunks").checked;
+  renderEvents();
+});
+$("toLatest").onclick = () => {
+  const box = $("evList");
+  box.scrollTop = box.scrollHeight;
+  updateLatestBtn(box);
+};
+$("evList").addEventListener("scroll", () => updateLatestBtn($("evList")));
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const name = tab.dataset.tab;
+    $("tabEvents").style.display = name === "events" ? "" : "none";
+    $("tabSubagents").style.display = name === "subagents" ? "" : "none";
+    $("tabRequests").style.display = name === "requests" ? "" : "none";
+    $("tabSkills").style.display = name === "skills" ? "" : "none";
+    $("tabSchedules").style.display = name === "schedules" ? "" : "none";
+    $("tabStats").style.display = name === "stats" ? "" : "none";
+    if (name === "stats") renderStats();
+    if (name === "skills") renderSkills();
+    if (name === "schedules") renderSchedules();
+  };
+});
+
+window.selectSession = selectSession;
+window.resolveRequest = resolveRequest;
+window.resolveApproval = resolveApproval;
+
+wirePet();
+connect();
+</script>
+</body>
+</html>

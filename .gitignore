@@ -1,0 +1,24 @@
+# runtime data
+sessions/
+.approval-bridge/
+.jspace/
+
+# agent-generated files land here by default
+workspace/
+
+# scheduled tasks runtime data
+schedules.json
+
+# python
+__pycache__/
+*.pyc
+*.log
+
+# env & secrets
+.env
+
+# misc
+.DS_Store
+node_modules/
+dist-exe/
+.private/

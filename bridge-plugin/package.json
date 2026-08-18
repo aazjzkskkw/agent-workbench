@@ -1,0 +1,11 @@
+{
+  "name": "workbench-approval-bridge",
+  "version": "0.1.0",
+  "description": "Bridges tool approvals between the Agent Desktop Workbench UI and the harness runtime via a file exchange",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

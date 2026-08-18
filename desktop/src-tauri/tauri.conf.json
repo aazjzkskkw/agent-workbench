@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Agent Workbench",
+  "version": "0.1.0",
+  "identifier": "com.deepseek.agent-workbench",
+  "build": {
+    "beforeDevCommand": "",
+    "devUrl": "http://127.0.0.1:8787",
+    "beforeBuildCommand": "",
+    "frontendDist": "http://127.0.0.1:8787"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Agent Desktop Workbench",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 940,
+        "minHeight": 600,
+        "url": "http://127.0.0.1:8787"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

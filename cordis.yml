@@ -1,0 +1,66 @@
+# Agent Desktop Workbench runtime composition: the bundled default plus the
+# skill registry and J-Space Cognition Suite (j-space skill + system prompt).
+# See python/sdk-runtime/.../runtime/cordis.yml for the base layout.
+
+# Stdio JSON-RPC server entry; without it the agent has no SDK client.
+- id: sdk-jsonrpc-server
+  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
+
+# Agent spine; the SDK server creates agents per sessionId.
+- id: agent-core
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    workspaceContext:
+      maxBytes: 65536
+
+# Stock DeepSeek adapter (DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL from env).
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek'
+
+# JSONL persistence; $DSH_SESSION_ROOT wins.
+- id: sessions
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
+
+- id: session-checkpoints
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'
+
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+
+- id: bash
+  name: '@deepseek-ai/dsh-bash-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+# ── skills + system prompt (needed by the j-space plugin) ──────────────────
+- id: skill
+  name: '@deepseek-ai/dsh-skill'
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+
+# J-Space Cognition Suite: registers the `j-space` skill and injects a
+# mandatory protocol section into every conversation's system prompt.
+- id: j-space-cognition-suite
+  name: j-space-cognition-suite
+  inject: [systemPrompt, skills]
+  config: {}
+
+# Workbench approval bridge: every bash call asks the workbench UI for an
+# explicit decision (file exchange via $DSH_APPROVAL_BRIDGE).
+- id: workbench-approval-bridge
+  name: workbench-approval-bridge
+  config: {}
