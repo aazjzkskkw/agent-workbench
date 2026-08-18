@@ -66,6 +66,6 @@
   config: {}
 
 # Secret guard: 拦截写入命令行的疑似密钥/Token，防止密钥泄漏进日志。
-- id: workbench-secret-guard
-  name: workbench-secret-guard
+- id: dsh-secret-guard
+  name: dsh-secret-guard
   config: {}

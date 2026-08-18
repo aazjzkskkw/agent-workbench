@@ -1,11 +1,34 @@
 {
-  "name": "workbench-secret-guard",
+  "name": "dsh-secret-guard",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 敏感信息防护插件：拦截写入命令行的疑似密钥/Token（API key、私钥、JWT 等），防止密钥泄漏进日志与会话记录",
-  "license": "MIT",
+  "description": "DeepSeek Harness 敏感信息防护插件：拦截写入命令行的疑似密钥/Token（API key、私钥、JWT 等），防止密钥泄漏进日志与会话记录。Secret guard plugin for DeepSeek Harness.",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "plugin",
+    "security",
+    "secret",
+    "guard",
+    "token",
+    "redaction",
+    "llm",
+    "agent"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

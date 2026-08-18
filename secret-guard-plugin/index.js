@@ -1,4 +1,4 @@
-// workbench-secret-guard —— DeepSeek Harness 敏感信息防护插件（host-only）。
+// dsh-secret-guard —— DeepSeek Harness 敏感信息防护插件（host-only）。
 //
 // 问题：agent 常把 API key / Token / 私钥直接写进命令行（`curl -H "Authorization: Bearer sk-..."`、
 // `git push` 带 token、`cat .env` 后回显……），密钥随即进入命令历史、工具结果与会话日志——
@@ -12,7 +12,7 @@
 //
 // 约束：node: 内置模块；无 @deepseek-ai/* 依赖；可配置（DSH_SECRET_GUARD_PATTERNS 追加）。
 
-export const name = 'workbench-secret-guard'
+export const name = 'dsh-secret-guard'
 
 const BUILTIN_PATTERNS = [
   // OpenAI / DeepSeek 风格 key
