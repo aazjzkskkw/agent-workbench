@@ -23,7 +23,7 @@ const TIMEOUT_MS = Number(process.env.DSH_APPROVAL_TIMEOUT ?? '120000')
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function writePending(id, exec) {
-  const args = exec.args && typeof exec.args === 'object' ? exec.args : {}
+  const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : (exec.args || {})
   const reason = typeof args.description === 'string'
     ? args.description
     : (exec.args === undefined ? '' : JSON.stringify(exec.args).slice(0, 300))

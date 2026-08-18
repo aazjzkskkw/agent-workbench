@@ -1,0 +1,11 @@
+{
+  "name": "workbench-secret-guard",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 敏感信息防护插件：拦截写入命令行的疑似密钥/Token（API key、私钥、JWT 等），防止密钥泄漏进日志与会话记录",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}
